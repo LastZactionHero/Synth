@@ -1,0 +1,8 @@
+[package]
+name = "ultimate_hacking_synth"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+cpal = "0.15.3"
+crossterm = "0.28.1"

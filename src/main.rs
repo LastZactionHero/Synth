@@ -1,12 +1,10 @@
-// - Make a tone
-// - Play tones based on key presses
+// - Play tones together
 // - Wave viewer
 // - Wave types
 // - Wave selectors/modifier
 // - Play a midi
 // - Record a midi from key presses
 // - Save a midi
-
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 use crossterm::{
     event::{
@@ -17,6 +15,8 @@ use crossterm::{
 };
 use std::f64::consts::PI;
 use std::io;
+use std::sync::mpsc;
+use std::thread;
 
 mod frequencies;
 use frequencies::Note;
@@ -84,7 +84,17 @@ fn play_note(note: Note) -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-fn print_events() -> Result<(), io::Error> {
+enum CaptureEvent {
+    Play(ReplaceEvent),
+    Unhandled,
+    Break,
+}
+
+struct ReplaceEvent {
+    note: Note,
+}
+
+fn capture_input(tx: mpsc::Sender<Note>) -> Result<(), io::Error> {
     crossterm::terminal::enable_raw_mode()?;
     execute!(
         std::io::stdout(),
@@ -97,26 +107,41 @@ fn print_events() -> Result<(), io::Error> {
         if poll(Duration::from_millis(1))? {
             let result = match read()? {
                 Event::Key(event) => match event.code {
-                    KeyCode::Char('a') => play_note(Note::C3),
-                    KeyCode::Char('w') => play_note(Note::Csharp3),
-                    KeyCode::Char('s') => play_note(Note::D3),
-                    KeyCode::Char('e') => play_note(Note::Dsharp3),
-                    KeyCode::Char('d') => play_note(Note::E3),
-                    KeyCode::Char('f') => play_note(Note::F3),
-                    KeyCode::Char('t') => play_note(Note::Fsharp3),
-                    KeyCode::Char('g') => play_note(Note::G3),
-                    KeyCode::Char('y') => play_note(Note::Gsharp3),
-                    KeyCode::Char('h') => play_note(Note::A3),
-                    KeyCode::Char('u') => play_note(Note::Asharp3),
-                    KeyCode::Char('j') => play_note(Note::B3),
-                    KeyCode::Char('k') => play_note(Note::C4),
-                    KeyCode::Char('q') => break,
-                    _ => Ok(()),
+                    KeyCode::Char('a') => CaptureEvent::Play(ReplaceEvent { note: Note::C3 }),
+                    KeyCode::Char('w') => CaptureEvent::Play(ReplaceEvent {
+                        note: Note::Csharp3,
+                    }),
+                    KeyCode::Char('s') => CaptureEvent::Play(ReplaceEvent { note: Note::D3 }),
+                    KeyCode::Char('e') => CaptureEvent::Play(ReplaceEvent {
+                        note: Note::Dsharp3,
+                    }),
+                    KeyCode::Char('d') => CaptureEvent::Play(ReplaceEvent { note: Note::E3 }),
+                    KeyCode::Char('f') => CaptureEvent::Play(ReplaceEvent { note: Note::F3 }),
+                    KeyCode::Char('t') => CaptureEvent::Play(ReplaceEvent {
+                        note: Note::Fsharp3,
+                    }),
+                    KeyCode::Char('g') => CaptureEvent::Play(ReplaceEvent { note: Note::G3 }),
+                    KeyCode::Char('y') => CaptureEvent::Play(ReplaceEvent {
+                        note: Note::Gsharp3,
+                    }),
+                    KeyCode::Char('h') => CaptureEvent::Play(ReplaceEvent { note: Note::A3 }),
+                    KeyCode::Char('u') => CaptureEvent::Play(ReplaceEvent {
+                        note: Note::Asharp3,
+                    }),
+                    KeyCode::Char('j') => CaptureEvent::Play(ReplaceEvent { note: Note::B3 }),
+                    KeyCode::Char('k') => CaptureEvent::Play(ReplaceEvent { note: Note::C4 }),
+                    KeyCode::Char('q') => CaptureEvent::Break,
+                    _ => CaptureEvent::Unhandled,
                 },
-                _ => Ok(()),
+                _ => CaptureEvent::Unhandled,
             };
-            if result.is_err() {
-                println!("an error of some kind!");
+
+            match result {
+                CaptureEvent::Play(event) => {
+                    tx.send(event.note).unwrap();
+                }
+                CaptureEvent::Break => break,
+                CaptureEvent::Unhandled => (),
             }
         }
     }
@@ -125,8 +150,25 @@ fn print_events() -> Result<(), io::Error> {
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let _ = print_events();
+    let (tx, rx) = mpsc::channel();
 
+    let capture_input_handle = thread::spawn(move || {
+        let _ = capture_input(tx);
+    });
+
+    loop {
+        match rx.recv() {
+            Ok(msg) => {
+                println!("got a message!\r");
+                let _ = play_note(msg);
+            }
+            Err(e) => {
+                eprintln!("Oh no!: {}", e);
+                break;
+            }
+        }
+    }
+    capture_input_handle.join().unwrap();
     Ok(())
 }
 

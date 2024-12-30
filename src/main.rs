@@ -98,17 +98,20 @@ fn print_events() -> Result<(), io::Error> {
             let result = match read()? {
                 Event::Key(event) => match event.code {
                     KeyCode::Char('a') => play_note(Note::C3),
+                    KeyCode::Char('w') => play_note(Note::Csharp3),
                     KeyCode::Char('s') => play_note(Note::D3),
+                    KeyCode::Char('e') => play_note(Note::Dsharp3),
                     KeyCode::Char('d') => play_note(Note::E3),
                     KeyCode::Char('f') => play_note(Note::F3),
+                    KeyCode::Char('t') => play_note(Note::Fsharp3),
                     KeyCode::Char('g') => play_note(Note::G3),
+                    KeyCode::Char('y') => play_note(Note::Gsharp3),
                     KeyCode::Char('h') => play_note(Note::A3),
+                    KeyCode::Char('u') => play_note(Note::Asharp3),
                     KeyCode::Char('j') => play_note(Note::B3),
                     KeyCode::Char('k') => play_note(Note::C4),
-                    _ => {
-                        dbg!(event);
-                        todo!()
-                    }
+                    KeyCode::Char('q') => break,
+                    _ => Ok(()),
                 },
                 _ => Ok(()),
             };
@@ -122,7 +125,6 @@ fn print_events() -> Result<(), io::Error> {
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    play_note(Note::A2);
     let _ = print_events();
 
     Ok(())
